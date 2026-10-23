@@ -1,0 +1,50 @@
+name: Daily 7 Asia & Europe Indices Auto Update & GitHub Pages Deploy
+
+on:
+  schedule:
+    # 1. 亞股四大指數 (日經225 / 南韓綜合 / 上證 / 恆生) 週一至週五收盤後自動執行：UTC 08:35 (台灣時間週一至週五下午 16:35)
+    - cron: '35 8 * * 1-5'
+    # 2. 歐洲三大指數 (德國DAX / 倫敦FTSE 100 / 法國CAC 40) 週一至週五收盤後自動執行：UTC 17:05 (台灣時間週二至週六凌晨 01:05)
+    - cron: '5 17 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-all-indices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run All 7 Asia & Europe Indices (N225 / KS11 / SSEC / HSI / GDAXI / FTSE / FCHI) Calculation & Portal Builder
+        run: |
+          python update_all_indices.py
+
+      - name: Send Daily Email Report (Optional if Secrets Configured)
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          python send_email_report.py
+
+      - name: Commit and Push Updated CSVs & HTML to GitHub Pages
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ index.html 亞歐七大指數高低控統整_多週期與跨週期前瞻雙軌通道分析系統_v*.html
+          git commit -m "Auto update 7 Asia & Europe indices data: $(date '+%Y-%m-%d %H:%M')" || exit 0
+          git pull --rebase origin main || true
+          git push origin main || true
